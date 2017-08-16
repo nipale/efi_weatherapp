@@ -1,0 +1,7 @@
+export GCE_EMAIL='your-sa@your-project-name.iam.gserviceaccount.com'
+export GCE_PROJECT='your-gce-project-name'
+export GCE_CREDENTIALS_FILE_PATH='/path/to/your-key.json'
+export APPID=‘your-weatherapp-api-key’
+export LETSENCRYPT_HOST_1=‘your-domain-for-backend’
+export LETSENCRYPT_HOST_2=‘your-domain-for-frontend’
+export LETSENCRYPT_EMAIL='your-email-to-contact-you’

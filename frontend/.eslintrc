@@ -3,14 +3,14 @@
   "extends": "airbnb",
   "env": {
     "es6": true,
-    "node": true
+    "node": true,
+    "browser": true
   },
   "rules": {
     "semi": ["error", "always"],
     "comma-dangle": ["error", "always-multiline"]
   },
   "globals": {
-    "fetch": false,
-    "document": true
+    "fetch": false
   }
 }

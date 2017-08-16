@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "DEBUG=weathermap ./node_modules/.bin/nodemon src/index.js",
-    "lint": "eslint src/*.js"
+    "lint": "./node_modules/.bin/eslint src/*.js"
   },
   "dependencies": {
     "debug": "^2.6.3",

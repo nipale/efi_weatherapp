@@ -1,14 +1,29 @@
 body{
-  overflow: hidden;
+  overflow-x: hidden;
   position: absolute;
   width: 100%;
-  height: 100%;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: baseline;
 }
 
 .icon {
-  width: 30vw;
-  height: 30vw;
+  width: 40vw;
+  height: 26vh;
 }
+.icon img {
+  width: 26vw;
+  height: 26vh;
+}
+.icon img:last-of-type {
+  width: 35vw;
+  height: 35vh;
+}
+.icon h1::before {
+  content: "Location: ";
+  color: blueviolet;
+}
+.icon h2 {
+  color: darkslateblue;
+}
+

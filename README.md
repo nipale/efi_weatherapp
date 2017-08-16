@@ -1,56 +1,48 @@
-# Weatherapp
+# Fluffy the Weatherapp
 
-There was a beautiful idea of building an app that would show the upcoming weather. The developers wrote a nice backend and a frontend following the latest principles and - to be honest - bells and whistles. However, the developers did not remember to add any information about the infrastructure or even setup instructions in the source code.
+Reports the current weather and forecasts in 3 hours slots. The frontend uses the browser's geolocation and fetches the location based weather data through the backend from openweathermap. `React-geolocated` package is used.
 
-Luckily we now have [docker compose](https://docs.docker.com/compose/) saving us from installing the tools on our computer, and making sure the app looks (and is) the same in development and in production. All we need is someone to add the few missing files!
+There are two options to configure Fluffy the weatherapp. The first option runs the app virtually on any environment where [Docker](https://www.docker.com/) and [Docker Compose](https://docs.docker.com/compose/) are installed. Then the app itself runs in the environments localhost. The second option presents the configuration where the app is set up in Google Cloud with an ansible playbook.
 
-## Prerequisites
+## Run app in localhost
 
-* An [openweathermap](http://openweathermap.org/) API key.
-* [Docker](https://www.docker.com/) and [docker compose](https://docs.docker.com/compose/) installed.
+When environment has Docker and Docker Compose installed Fluffy the weatherapp can be started with the **docker-compose.yml** -file. This starts the app in a connected set of containers. In addition, an openweathermap api key is needed as an environment variable `APPID with this configuration.
 
-## Returning your solution
+This configuration uses volumes to share the development files. There is also an option for running the app with hot reload for both the backend and the frontend containers. For the frontend it is already enabled with `--hot --inline` options in package.json's `start` command. For the backend it can be enabled using `CMD [ "npm", "run", "dev" ]` instead of CMD [ "npm", "start" ]` in its **Dockerfile**.
 
-### Via github
+If Eslint is needed uncomment the `CMD [ "npm", "run", "lint" ]` lines in both the **Dockerfile**s in the backend and the frontend directory.
 
-* Make a copy of this repository in your own github account (do not fork unless you really want to be public).
-* Create a personal repository in github.
-* Make changes, commit them, and push them in your own repository.
-* Send us the url where to find the code.
+## Set up in Google Cloud Platform
 
-### Via tar-package
+Fluffy the weatherapp installation in Google Cloud Platform can be made with the **weatherapp.yml** -file which contains ansible playbooks for creating the VM and installing the app itself. Firstly, you need [Ansible](https://www.ansible.com/) installed on your system. In addition, for the automated installation, all the environment variables presented below are needed.
 
-* Clone this repository.
-* Make changes and **commit them**.
-* Create a **.tgz** -package including the **.git**-directory, but excluding the **node_modules**-directories.
-* Send us the archive.
+### Environment variables needed:
 
-## Exercises
+* GCE_EMAIL: <your-sa@your-project-name.iam.gserviceaccount.com>
+* GCE_PROJECT: <your-gce-project-name>
+* GCE_CREDENTIALS\_FILE\_PATH: </path/to/your-key.json>
+* APPID: <your-weatherapp-api-key>
+* LETSENCRYPT_HOST_1: <your-domain-for-frontend>
+* LETSENCRYPT_HOST_2: <your-domain-for-backend>
+* LETSENCRYPT_EMAIL: <your-email-to-contact-you>
 
-There are a few things you must do to get the app up and running. After that there are a few things you can do to make it better.
+### Present the following steps:
 
-### Mandatory
+1. Create a directory called `roles/`
 
-* Get yourself an API key to make queries in the [openweathermap](http://openweathermap.org/).
+2. Install Ansible Galaxy roles running the command `ansible-galaxy install -r requirements.yml --force -p roles`
 
-* Either run the app locally (using `npm i && npm start`) or move to the next step.
+3. Run the the **weatherapp.yml** ansible playbook by running the command `ansible-playbook weatherapp.yml -u <your-google-username>` (The last -u switch is needed if your environment user name differs from your google username)
 
-* Add **Dockerfile**'s in the *frontend* and the *backend* directories to run them virtually on any environment having [docker](https://www.docker.com/) installed. It should work by saying e.g. `docker build -t weatherapp_backend . && docker run --rm -i -p 9000:9000 --name weatherapp_backend -t weatherapp_backend`. If it doesn't, remember to check your api key first.
+The first play of the **weatherapp.yml** playbook launches `gce` instance with a machine type `n1-standard-1` which runs `debian-9`. It also waits for SSH to come up and adds host to groupname.
 
-* Add a **docker-compose.yml** -file connecting the frontend and the backend, enabling running the app in a connected set of containers.
+The second play installs the actual weatherapp. First, Docker is installed by using roles `ansible-role-docker` and `ansible-role-pip`. Sources for these roles may be found in **requirements.yml**. Second, the actual containers for running the app are built and started.
 
-### Optional (do as many as you like)
+For https connections `jwilder/nginx-proxy` container is used in front of both the backend and the frontend container to serve https. Together with `jrcs/letsencrypt-nginx-proxy-companion` the needed certificates are automatically created when the backend and frontend containers are started after these two nginx containers. These additional containers enable the using of the same frontend and backend implementation from localhost configuration.
 
-* The application now only reports the current weather. It should probably report the forecast e.g. a few hours from now. (tip: [openweathermap api](https://openweathermap.org/forecast5))
+## Live Fluffy the weatherapp
 
-* The developers are still keen to run the app and its pipeline on their own computers. Share the development files for the container by using volumes, and make sure the containers are started with a command enabling hot reload.
+Currently Fluffy the weatherapp is installed on Google Cloud Platform and can be visited with the links below:
 
-* There are [eslint](http://eslint.org/) errors. Sloppy coding it seems. Please help.
-
-* The app currently reports the weather only for location defined in the *backend*. Shouldn't it check the browser location and use that as the reference for making a forecast? (tip: [geolocation](https://developer.mozilla.org/en-US/docs/Web/API/Geolocation/Using_geolocation))
-
-* There are no tests. Where are the tests? (tip: [mocha](https://mochajs.org/) or [robot framework](http://robotframework.org/)) Disclaimer: this is not an easy task. If you really want to try writing robot tests, start by creating a third container that gives expected weather data, and direct the backend queries there by redefining the **MAP_ENDPOINT**.
-
-* Set up the weather service in a free cloud hosting service, e.g. [AWS](https://aws.amazon.com/free/) or [Google Cloud](https://cloud.google.com/free/).
-
-* Write [ansible](http://docs.ansible.com/ansible/intro.html) playbooks for installing [docker](https://www.docker.com/) and the app itself.
+* Frontend: [fluffy.fly.fi](http://fluffy.fly.fi)
+* Backend: [cloudy.fluffy.fly.fi/api/weather/](http://cloudy.fluffy.fly.fi/api/weather/)

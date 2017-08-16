@@ -1,0 +1,160 @@
+- name: Create instance(s)
+  hosts: localhost
+  gather_facts: no
+  connection: local
+
+  vars:
+    machine_type: n1-standard-1 # default
+    image: debian-9
+
+  tasks:
+    - name: Launch instances
+      gce:
+          instance_names: dev
+          machine_type: "{{ machine_type }}"
+          image: "{{ image }}"
+          tags: webserver
+      register: gce
+
+    - name: Wait for SSH to come up
+      wait_for: host={{ item.public_ip }} port=22 delay=10 timeout=60
+      with_items: "{{ gce.instance_data }}"
+
+    - name: Add host to groupname
+      add_host: hostname={{ item.public_ip }} groupname=new_instances
+      with_items: "{{ gce.instance_data }}"
+
+
+- name: Installs da supa weta app
+  hosts: new_instances
+  become: True
+  vars:
+    pip_install_packages:
+      - name: docker
+  roles:
+    - ansible-role-docker
+    - ansible-role-pip
+
+  tasks:
+    # Set ip forwarding on in /proc and do not reload the sysctl file
+    - name: Set ip forwarding and do not reload the sysctl file
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: 1
+        sysctl_set: yes
+
+
+    # Pull images for Nginx-proxy and let's encrypt containers
+
+    - name: Pull a Nginx-proxy image
+      docker_image:
+        name: jwilder/nginx-proxy
+        tag: alpine
+
+    - name: Pull a letsencrypt-nginx-proxy-companion image
+      docker_image:
+        name: jrcs/letsencrypt-nginx-proxy-companion
+
+    # Run Nginx and Let's encrypt containers -->
+
+    - name: Run the Nginx-proxy container
+      docker_container:
+        name: nginx-proxy
+        image: jwilder/nginx-proxy
+        state: started
+        published_ports:
+          - "80:80"
+          - "443:443"
+        volumes:
+          - /etc/nginx/vhost.d
+          - /usr/share/nginx/html
+          - /etc/nginx/certs:/etc/nginx/certs:ro
+          - /var/run/docker.sock:/tmp/docker.sock:ro
+        labels:
+          com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy=""
+
+    - name: Run the nginx-letsencrypt container
+      docker_container:
+        name: nginx-letsencrypt
+        image: jrcs/letsencrypt-nginx-proxy-companion
+        state: started
+        #env:
+          # staging below will use test servers that don't have the 5 certs/week/domain limits
+          # ACME_CA_URI: "https://acme-staging.api.letsencrypt.org/directory"
+        volumes:
+          - /etc/nginx/certs:/etc/nginx/certs:rw
+          - /var/run/docker.sock:/var/run/docker.sock:ro
+        volumes_from:
+          - nginx-proxy
+
+
+    # Upload site directories and create images for frontend and backend...
+    # Run containers after the nginx stuff --> 
+
+    # Backend -->
+
+    - name: Upload the site directory to the docker
+      synchronize:
+        src: backend
+        dest: /tmp/
+      register: sync_result
+
+    - name: Build the backend image
+      docker_image:
+        name: weatherapp_backend_image
+        path: /tmp/backend
+        state: present
+      when: sync_result.changed
+
+    - name: Run the backend container
+      docker_container:
+        name: weatherapp_backend
+        image: weatherapp_backend_image
+        state: started
+        published_ports:
+          - "9000:9000"
+        env:
+          APPID: "{{ lookup('env', 'APPID') }}"
+          VIRTUAL_HOST: "{{ lookup('env', 'LETSENCRYPT_HOST_2') }}"
+          LETSENCRYPT_HOST: "{{ lookup('env', 'LETSENCRYPT_HOST_2') }}"
+          LETSENCRYPT_EMAIL: "{{ lookup('env', 'LETSENCRYPT_EMAIL') }}"
+        volumes:
+          - /tmp/backend/src:/usr/src/weatherapp/src
+
+    # Frontend -->
+
+    - name: Upload the site directory to the docker
+      synchronize:
+        src: frontend
+        dest: /tmp/
+      register: sync_result
+
+    - name: Build the frontend image
+      docker_image:
+        name: weatherapp_frontend_image
+        path: /tmp/frontend
+        state: present
+      when: sync_result.changed
+
+    - name: Run the frontend container
+      docker_container:
+        name: weatherapp_frontend
+        image: weatherapp_frontend_image
+        state: started
+        published_ports:
+          - "8000:8000"
+        env:
+          ENDPOINT: "https://{{ lookup('env', 'LETSENCRYPT_HOST_2') }}:443/api"
+          VIRTUAL_HOST: "{{ lookup('env', 'LETSENCRYPT_HOST_1') }}"
+          LETSENCRYPT_HOST: "{{ lookup('env', 'LETSENCRYPT_HOST_1') }}"
+          LETSENCRYPT_EMAIL: "{{ lookup('env', 'LETSENCRYPT_EMAIL') }}"
+        volumes:
+          - /tmp/frontend/src:/usr/src/weatherapp/src
+
+
+    # Install net-tools for debugging
+    - name: Install the latest version of net-tools
+      package:
+        name: net-tools
+        state: latest
+

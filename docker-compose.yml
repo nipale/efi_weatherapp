@@ -1,0 +1,19 @@
+version: '2'
+services:
+  frontend:
+    build: frontend
+    ports:
+      - "8000:8000"
+    links:
+      - backend
+    volumes:
+      - ./frontend/src:/usr/src/weatherapp/src
+  backend:
+    build: backend
+    ports:
+      - "9000:9000"
+    environment:
+      - APPID=${APPID}
+    # - APPID=__your_weatherapp_api_key_here__
+    volumes:
+      - ./backend/src:/usr/src/weatherapp/src
